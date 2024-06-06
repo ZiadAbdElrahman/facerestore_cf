@@ -114,12 +114,12 @@ class FaceRestoreCFWithModel:
         return {"required": { "facerestore_model": ("FACERESTORE_MODEL",),
                               "image": ("IMAGE",),
                               "facedetection": (["retinaface_resnet50", "retinaface_mobile0.25", "YOLOv5l", "YOLOv5n"],),
-+                              "codeformer_fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1, "step": 0.05}),
-+                              "turn_on": ("NUMBER", ),
-+                              },
-+                "optional": {
-+                        "is_face_detected_list":("LIST", )
-+                },}
+                              "codeformer_fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1, "step": 0.05}),
+                              "turn_on": ("NUMBER", ),
+                              },
+                "optional": {
+                        "is_face_detected_list":("LIST", )
+                },}
         
     RETURN_TYPES = ("IMAGE",)
 
@@ -130,12 +130,12 @@ class FaceRestoreCFWithModel:
     def __init__(self):
         self.face_helper = None
 
-+    def restore_face(self, facerestore_model, image, facedetection, codeformer_fidelity, turn_on, is_face_detected_list=None):
-+        if is_face_detected_list is None:
-+            is_face_detected_list = [True] * image.size()[0]
-+
-+        if turn_on == 0 or not any(is_face_detected_list):
-+            return (image, )
+    def restore_face(self, facerestore_model, image, facedetection, codeformer_fidelity, turn_on, is_face_detected_list=None):
+        if is_face_detected_list is None:
+            is_face_detected_list = [True] * image.size()[0]
+
+        if turn_on == 0 or not any(is_face_detected_list):
+            return (image, )
         print(f'\tStarting restore_face with codeformer_fidelity: {codeformer_fidelity}')
         device = model_management.get_torch_device()
         facerestore_model.to(device)
@@ -148,9 +148,9 @@ class FaceRestoreCFWithModel:
         out_images = np.ndarray(shape=image_np.shape)
 
         for i in range(total_images):
-+            if not is_face_detected_list[i]:
-+                out_images[i] = image_np[i]
-+                continue
+            if not is_face_detected_list[i]:
+                out_images[i] = image_np[i]
+                continue
             cur_image_np = image_np[i,:, :, ::-1]
 
             original_resolution = cur_image_np.shape[0:2]
