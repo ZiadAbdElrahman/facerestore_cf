@@ -130,12 +130,19 @@ class FaceRestoreHelper(object):
             f = 512.0/min(self.input_img.shape[:2])
             self.input_img = cv2.resize(self.input_img, (0,0), fx=f, fy=f, interpolation=cv2.INTER_LINEAR)
 
+    def is_overlap(self, bbox1, bbox2):
+        return bbox1[0] <= bbox2[0] and bbox1[1] <= bbox2[1] and bbox1[2] <= bbox2[2] and bbox1[3] <= bbox2[3]
+    
+    def bbox_distance(self, bbox1, bbox2):
+        return abs(bbox1[0] - bbox2[0]) + abs(bbox1[1] - bbox2[1]) + abs(bbox1[2] - bbox2[2]) + abs(bbox1[3] - bbox2[3])
+
     def get_face_landmarks_5(self,
                              only_keep_largest=False,
                              only_center_face=False,
                              resize=None,
                              blur_ratio=0.01,
-                             eye_dist_threshold=None):
+                             eye_dist_threshold=None,
+                             bbox_input=None):
         if resize is None:
             scale = 1
             input_img = self.input_img
@@ -149,25 +156,47 @@ class FaceRestoreHelper(object):
 
         with torch.no_grad():
             bboxes = self.face_det.detect_faces(input_img)
-
+        
         if bboxes is None or bboxes.shape[0] == 0:
             return 0
         else:
             bboxes = bboxes / scale
 
-        for bbox in bboxes:
-            # remove faces with too small eye distance: side faces or too small faces
-            eye_dist = np.linalg.norm([bbox[6] - bbox[8], bbox[7] - bbox[9]])
-            if eye_dist_threshold is not None and (eye_dist < eye_dist_threshold):
-                continue
+        if  bbox_input is None:
+            for bbox in bboxes:
+                # remove faces with too small eye distance: side faces or too small faces
+                eye_dist = np.linalg.norm([bbox[6] - bbox[8], bbox[7] - bbox[9]])
+                if eye_dist_threshold is not None and (eye_dist < eye_dist_threshold):
+                    continue
 
-            if self.template_3points:
-                landmark = np.array([[bbox[i], bbox[i + 1]] for i in range(5, 11, 2)])
-            else:
-                landmark = np.array([[bbox[i], bbox[i + 1]] for i in range(5, 15, 2)])
-            self.all_landmarks_5.append(landmark)
-            self.det_faces.append(bbox[0:5])
+                if self.template_3points:
+                    landmark = np.array([[bbox[i], bbox[i + 1]] for i in range(5, 11, 2)])
+                else:
+                    landmark = np.array([[bbox[i], bbox[i + 1]] for i in range(5, 15, 2)])
+                
+                self.all_landmarks_5.append(landmark)
+                self.det_faces.append(bbox[0:5])
+                
+        else:
+            all_landmarks_5 = []
+            det_faces = []
+            for bbox in bboxes:
+                eye_dist = np.linalg.norm([bbox[6] - bbox[8], bbox[7] - bbox[9]])
+                if eye_dist_threshold is not None and (eye_dist < eye_dist_threshold):
+                    continue
+                if self.template_3points:
+                    landmark = np.array([[bbox[i], bbox[i + 1]] for i in range(5, 11, 2)])
+                else:
+                    landmark = np.array([[bbox[i], bbox[i + 1]] for i in range(5, 15, 2)])
+                all_landmarks_5.append(landmark)
+                det_faces.append(bbox[0:5])
             
+            for in_bbox in bbox_input: 
+                input_bbox_2_detected_bbox_distance = [self.bbox_distance(in_bbox, bb) for bb in det_faces]
+                min_index = np.argmin(input_bbox_2_detected_bbox_distance)
+                self.all_landmarks_5.append(all_landmarks_5[min_index])
+                self.det_faces.append(det_faces[min_index])
+      
         if len(self.det_faces) == 0:
             return 0
         if only_keep_largest:
